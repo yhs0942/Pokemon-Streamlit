@@ -1,5 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import urllib.request
+from io import BytesIO
 
 st.set_page_config(
     page_title="MBTI 단짝 포켓몬 찾기",
@@ -108,6 +110,28 @@ POKEMON = {
     },
 }
 
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_pokemon_image(image_id):
+    """공식 일러스트를 우선 가져오고, 실패하면 다른 공개 스프라이트를 시도합니다."""
+    urls = [
+        f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{image_id}.png",
+        f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/{image_id}.png",
+        f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{image_id}.png",
+    ]
+    for url in urls:
+        try:
+            request = urllib.request.Request(
+                url, headers={"User-Agent": "MBTI-Pokemon-Partner-App/1.0"}
+            )
+            with urllib.request.urlopen(request, timeout=8) as response:
+                image_bytes = response.read()
+                if response.headers.get("Content-Type", "").startswith("image/") and image_bytes:
+                    return image_bytes, url
+        except Exception:
+            continue
+    return None, None
+
 MBTI_GROUPS = {
     "🧠 분석가": ["INTJ", "INTP", "ENTJ", "ENTP"],
     "💗 외교관": ["INFJ", "INFP", "ENFJ", "ENFP"],
@@ -163,23 +187,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown("### 🌟 나의 MBTI를 골라 주세요")
-st.write("아래에서 유형을 누르면 단짝 포켓몬을 바로 찾아드려요!")
-
 if "selected_mbti" not in st.session_state:
     st.session_state.selected_mbti = None
 
-for group_name, types in MBTI_GROUPS.items():
-    st.markdown(f"#### {group_name}")
-    cols = st.columns(4)
-    for col, mbti in zip(cols, types):
-        with col:
-            if st.button(mbti, key=f"mbti_{mbti}", use_container_width=True):
-                st.session_state.selected_mbti = mbti
-                st.rerun()
-
 selected = st.session_state.selected_mbti
-
 if selected:
     p = POKEMON[selected]
     st.markdown("---")
@@ -213,8 +224,14 @@ if selected:
 
     left, right = st.columns([1, 1.15], gap="large")
     with left:
-        image_url = f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{p['id']}.png"
-        st.image(image_url, use_container_width=True)
+        image_bytes, image_url = get_pokemon_image(p["id"])
+        if image_bytes:
+            st.image(BytesIO(image_bytes), use_container_width=True)
+        else:
+            st.warning("포켓몬 이미지를 불러오지 못했어요. 인터넷 연결을 확인하거나 아래 링크를 눌러 확인해 주세요.")
+            st.markdown(
+                f"[{p['name']} 이미지 열기](https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{p['id']}.png)"
+            )
         st.markdown(
             f"<div style='text-align:center'><span class='pill'>{p['emoji']} 타입: {p['types']}</span></div>",
             unsafe_allow_html=True,
@@ -240,6 +257,18 @@ else:
     결과는 정답이라기보다 가볍게 즐기는 궁합 테스트로 봐 주세요!
     </div>
     """, unsafe_allow_html=True)
+
+st.markdown("### 🌟 나의 MBTI를 골라 주세요")
+st.write("아래에서 유형을 누르면 단짝 포켓몬을 바로 찾아드려요!")
+
+for group_name, types in MBTI_GROUPS.items():
+    st.markdown(f"#### {group_name}")
+    cols = st.columns(4)
+    for col, mbti in zip(cols, types):
+        with col:
+            if st.button(mbti, key=f"mbti_{mbti}", use_container_width=True):
+                st.session_state.selected_mbti = mbti
+                st.rerun()
 
 st.markdown("""
 <div style="text-align:center;color:#9b825d;font-size:.85rem;padding:2rem 0 .5rem">
