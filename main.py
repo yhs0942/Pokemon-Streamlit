@@ -190,6 +190,10 @@ st.markdown("""
 if "selected_mbti" not in st.session_state:
     st.session_state.selected_mbti = None
 
+def select_mbti(mbti):
+    """선택 변경을 Streamlit 콜백에서 먼저 저장해 결과가 매번 갱신되게 합니다."""
+    st.session_state.selected_mbti = mbti
+
 selected = st.session_state.selected_mbti
 if selected:
     p = POKEMON[selected]
@@ -266,9 +270,13 @@ for group_name, types in MBTI_GROUPS.items():
     cols = st.columns(4)
     for col, mbti in zip(cols, types):
         with col:
-            if st.button(mbti, key=f"mbti_{mbti}", use_container_width=True):
-                st.session_state.selected_mbti = mbti
-                st.rerun()
+            st.button(
+                mbti,
+                key=f"mbti_{mbti}",
+                use_container_width=True,
+                on_click=select_mbti,
+                args=(mbti,),
+            )
 
 st.markdown("""
 <div style="text-align:center;color:#9b825d;font-size:.85rem;padding:2rem 0 .5rem">
